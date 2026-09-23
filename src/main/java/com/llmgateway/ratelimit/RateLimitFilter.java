@@ -2,12 +2,16 @@ package com.llmgateway.ratelimit;
 
 import com.llmgateway.config.RateLimitProperties;
 import com.llmgateway.entity.ApiKey;
+import com.llmgateway.metrics.GatewayMetrics;
 import com.llmgateway.security.ApiKeyAuthenticationToken;
 import com.llmgateway.security.JsonErrorResponseWriter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import net.logstash.logback.argument.StructuredArguments;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -25,19 +29,24 @@ import java.io.IOException;
  */
 public class RateLimitFilter extends OncePerRequestFilter {
 
+    private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
+
     public static final String RATE_LIMIT_REMAINING_HEADER = "X-RateLimit-Remaining";
     public static final String RETRY_AFTER_HEADER = "Retry-After";
 
     private final RateLimiter rateLimiter;
     private final RateLimitProperties rateLimitProperties;
     private final JsonErrorResponseWriter errorResponseWriter;
+    private final GatewayMetrics gatewayMetrics;
 
     public RateLimitFilter(RateLimiter rateLimiter,
                             RateLimitProperties rateLimitProperties,
-                            JsonErrorResponseWriter errorResponseWriter) {
+                            JsonErrorResponseWriter errorResponseWriter,
+                            GatewayMetrics gatewayMetrics) {
         this.rateLimiter = rateLimiter;
         this.rateLimitProperties = rateLimitProperties;
         this.errorResponseWriter = errorResponseWriter;
+        this.gatewayMetrics = gatewayMetrics;
     }
 
     @Override
@@ -64,6 +73,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
         response.setHeader(RATE_LIMIT_REMAINING_HEADER, String.valueOf(result.remaining()));
 
         if (!result.allowed()) {
+            gatewayMetrics.recordRateLimitRejection();
+            log.info("rate limit exceeded",
+                    StructuredArguments.kv("apiKeyId", apiKey.getId()),
+                    StructuredArguments.kv("tier", apiKey.getTier()),
+                    StructuredArguments.kv("retryAfterSeconds", result.retryAfterSeconds()));
+
             response.setHeader(RETRY_AFTER_HEADER, String.valueOf(result.retryAfterSeconds()));
             // HttpServletResponse's SC_* constants predate RFC 6585 and don't include
             // 429, so HttpStatus (Spring's own enum, not tied to the old Servlet list)

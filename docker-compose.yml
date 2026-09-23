@@ -1,5 +1,6 @@
-# Local dev infrastructure. Postgres (Phase 2) + Redis (Phase 3); Prometheus and
-# Grafana are added here in Phase 6.
+# Local dev infrastructure. Postgres (Phase 2), Redis (Phase 3), Prometheus +
+# Grafana (Phase 6). The app itself runs on the host (mvnw spring-boot:run), not in
+# this compose file — Prometheus reaches it via host.docker.internal.
 services:
   postgres:
     image: postgres:16-alpine
@@ -29,6 +30,36 @@ services:
       timeout: 5s
       retries: 5
 
+  prometheus:
+    image: prom/prometheus:v2.53.5
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    extra_hosts:
+      # Lets the container reach the app running on the host. Docker Desktop
+      # (Mac/Windows) resolves this automatically; plain Linux Docker needs this
+      # host-gateway mapping explicitly, which is why it's here rather than assumed.
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:13.2.2
+    ports:
+      - "3000:3000"
+    environment:
+      # Local dev only — not a real secret, never used outside this compose file.
+      # Anonymous viewer access is on too, so the dashboard opens with no login step.
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
 volumes:
   postgres-data:
   redis-data:
+  prometheus-data:

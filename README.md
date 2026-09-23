@@ -8,7 +8,7 @@ Being built in phases — see progress below. Full architecture, setup instructi
 API docs will land in the README as later phases (observability, Docker Compose, CI,
 load test results) are completed.
 
-## Status: Phase 5 — failover and resilience
+## Status: Phase 6 — observability
 
 What exists so far:
 - Maven project, Java 21, Spring Boot 3.2.5, Maven Wrapper (`mvnw` / `mvnw.cmd`) so a
@@ -41,10 +41,24 @@ What exists so far:
   request transparently falls back to a local Ollama instance instead of failing —
   `ChatResponse.provider` reports whichever one actually answered
 - Clean package layout: `controller / service / provider / repository / entity /
-  security / ratelimit / cache / util / config / dto / exception`
+  security / ratelimit / cache / logging / metrics / util / config / dto / exception`
 - Global exception handler → consistent JSON error body on any failure, and now also
   logs the real stack trace server-side for anything unexpected (the client still
   only ever sees the generic message)
+- Actuator (`/actuator/health`, `/actuator/prometheus`) — an explicit allowlist, not
+  `*`, since endpoints like `/actuator/env` can leak config values. Health includes
+  the Gemini circuit breaker's own state, not just DB/Redis connectivity.
+- Custom Micrometer metrics (`GatewayMetrics`): chat request count + latency
+  histogram by provider, cache hit/miss, rate-limit rejections, provider fallback
+  count — all exported in Prometheus format alongside the auto-instrumented JVM/HTTP
+  metrics Spring Boot already provides for free
+- Every log line is JSON (`logstash-logback-encoder`) and carries a per-request
+  `requestId` (`RequestIdFilter`, via SLF4J's MDC) — generated fresh, or reused from
+  an incoming `X-Request-Id` header for cross-service correlation, and echoed back
+  as a response header
+- Prometheus + Grafana in `docker-compose.yml`, with a provisioned dashboard
+  (`monitoring/grafana/dashboards/llm-gateway.json`) — no manual setup after
+  `docker compose up`
 
 ### Running locally
 
@@ -54,11 +68,17 @@ cp .env.example .env
 # Ollama fallback is optional for local dev — the app runs fine without it; Gemini
 # failures without Ollama installed just surface as a 502 instead of failing over.
 
-docker compose up -d postgres redis
+docker compose up -d postgres redis prometheus grafana
 
 # load .env into your shell, then:
 ./mvnw spring-boot:run   # or .\mvnw.cmd spring-boot:run on Windows
 ```
+
+Once running: Grafana at [http://localhost:3000](http://localhost:3000) (anonymous
+viewer access is on — no login needed) has the "LLM API Gateway" dashboard already
+provisioned. Prometheus itself is at [http://localhost:9090](http://localhost:9090).
+Raw endpoints: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health),
+[http://localhost:8080/actuator/prometheus](http://localhost:8080/actuator/prometheus).
 
 ```bash
 # 1. Create a key (returns the raw key once) — requires the admin token
@@ -105,5 +125,5 @@ $env:DOCKER_HOST = "npipe:////./pipe/dockerDesktopLinuxEngine"
 - [x] Phase 3: Distributed rate limiting (Redis + Lua)
 - [x] Phase 4: Response caching and usage metering
 - [x] Phase 5: Failover and resilience (Ollama fallback, circuit breaker)
-- [ ] Phase 6: Observability (Prometheus + Grafana)
+- [x] Phase 6: Observability (Prometheus + Grafana)
 - [ ] Phase 7: Testing, load test, CI, docs

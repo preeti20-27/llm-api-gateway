@@ -5,6 +5,7 @@ import com.llmgateway.cache.CachedChatResult;
 import com.llmgateway.cache.ResponseCache;
 import com.llmgateway.dto.ChatRequest;
 import com.llmgateway.dto.ChatResponse;
+import com.llmgateway.metrics.GatewayMetrics;
 import com.llmgateway.provider.LlmProvider;
 import com.llmgateway.provider.LlmProviderResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,11 +39,14 @@ class ChatServiceTest {
     @Mock
     private UsageLogService usageLogService;
 
+    @Mock
+    private GatewayMetrics gatewayMetrics;
+
     private ChatService chatService;
 
     @BeforeEach
     void setUp() {
-        chatService = new ChatService(llmProvider, responseCache, cacheKeyGenerator, usageLogService);
+        chatService = new ChatService(llmProvider, responseCache, cacheKeyGenerator, usageLogService, gatewayMetrics);
     }
 
     @Test
@@ -63,6 +67,8 @@ class ChatServiceTest {
 
         verify(responseCache).put(eq("cache-key-abc"), eq(new CachedChatResult("hi there", 5, "gemini")));
         verify(usageLogService).recordAsync(eq(apiKeyId), eq("gemini"), eq(5), eq(false), anyLong());
+        verify(gatewayMetrics).recordCacheMiss();
+        verify(gatewayMetrics).recordChatRequest(eq("gemini"), eq(false), anyLong());
     }
 
     @Test
@@ -83,5 +89,7 @@ class ChatServiceTest {
 
         verifyNoInteractions(llmProvider);
         verify(usageLogService).recordAsync(eq(apiKeyId), eq("gemini"), eq(5), eq(true), anyLong());
+        verify(gatewayMetrics).recordCacheHit();
+        verify(gatewayMetrics).recordChatRequest(eq("gemini"), eq(true), anyLong());
     }
 }

@@ -1,5 +1,6 @@
 package com.llmgateway.config;
 
+import com.llmgateway.metrics.GatewayMetrics;
 import com.llmgateway.ratelimit.RateLimitFilter;
 import com.llmgateway.ratelimit.RateLimiter;
 import com.llmgateway.repository.ApiKeyRepository;
@@ -57,11 +58,12 @@ public class SecurityConfig {
                                                         JsonAuthenticationEntryPoint entryPoint,
                                                         RateLimiter rateLimiter,
                                                         RateLimitProperties rateLimitProperties,
-                                                        JsonErrorResponseWriter errorResponseWriter) throws Exception {
+                                                        JsonErrorResponseWriter errorResponseWriter,
+                                                        GatewayMetrics gatewayMetrics) throws Exception {
         ApiKeyAuthenticationFilter apiKeyAuthenticationFilter =
                 new ApiKeyAuthenticationFilter(apiKeyRepository, apiKeyHasher, entryPoint);
         RateLimitFilter rateLimitFilter =
-                new RateLimitFilter(rateLimiter, rateLimitProperties, errorResponseWriter);
+                new RateLimitFilter(rateLimiter, rateLimitProperties, errorResponseWriter, gatewayMetrics);
 
         http
                 // Stateless API authenticated by a header, not a browser session. CSRF
@@ -73,6 +75,12 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        // Phase 6 scope note: actuator (health/metrics/prometheus) is
+                        // wide open, like /admin/keys was before Phase 2's follow-up —
+                        // fine for local dev and this project's scope, but production
+                        // would want this on a separate, internal-only management port
+                        // (management.server.port), not exposed on the public API port.
+                        .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/v1/**").authenticated()
                         .anyRequest().denyAll()
                 )

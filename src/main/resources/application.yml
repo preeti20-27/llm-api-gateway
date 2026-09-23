@@ -81,6 +81,21 @@ resilience4j:
       gemini:
         timeout-duration: 5s
 
+management:
+  endpoints:
+    web:
+      exposure:
+        # Explicit allowlist, not "*": /actuator/env, /actuator/beans etc. can leak
+        # config values (including secrets) or internals. health/info/metrics/
+        # prometheus is exactly what monitoring infra needs and nothing more.
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      show-details: always # fine for this project's scope; see SecurityConfig's note on actuator exposure
+  health:
+    circuitbreakers:
+      enabled: true # surfaces the "gemini" circuit breaker's state on /actuator/health
+
 logging:
   level:
     com.llmgateway: INFO

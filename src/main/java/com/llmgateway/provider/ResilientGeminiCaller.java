@@ -1,8 +1,12 @@
 package com.llmgateway.provider;
 
+import com.llmgateway.metrics.GatewayMetrics;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
+import net.logstash.logback.argument.StructuredArguments;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.CompletableFuture;
@@ -22,15 +26,19 @@ import java.util.concurrent.ExecutorService;
 @Component
 public class ResilientGeminiCaller {
 
+    private static final Logger log = LoggerFactory.getLogger(ResilientGeminiCaller.class);
+
     private final GeminiProvider geminiProvider;
     private final OllamaProvider ollamaProvider;
     private final ExecutorService virtualThreadExecutor;
+    private final GatewayMetrics gatewayMetrics;
 
     public ResilientGeminiCaller(GeminiProvider geminiProvider, OllamaProvider ollamaProvider,
-                                  ExecutorService virtualThreadExecutor) {
+                                  ExecutorService virtualThreadExecutor, GatewayMetrics gatewayMetrics) {
         this.geminiProvider = geminiProvider;
         this.ollamaProvider = ollamaProvider;
         this.virtualThreadExecutor = virtualThreadExecutor;
+        this.gatewayMetrics = gatewayMetrics;
     }
 
     /**
@@ -48,11 +56,15 @@ public class ResilientGeminiCaller {
 
     /**
      * Signature is fixed by Resilience4j's convention: same parameters as the
-     * annotated method, plus the Throwable that triggered the fallback (unused here —
-     * Ollama is tried unconditionally, regardless of why Gemini didn't answer).
+     * annotated method, plus the Throwable that triggered the fallback.
      */
     private CompletableFuture<LlmProviderResponse> fallbackToOllama(String prompt, String model, Integer maxTokens,
                                                                       Throwable throwable) {
+        gatewayMetrics.recordProviderFallback();
+        log.warn("falling back to ollama",
+                StructuredArguments.kv("reason", throwable.getClass().getSimpleName()),
+                StructuredArguments.kv("message", throwable.getMessage()));
+
         return CompletableFuture.supplyAsync(() -> ollamaProvider.generate(prompt, model, maxTokens), virtualThreadExecutor);
     }
 }

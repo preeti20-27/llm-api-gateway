@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Structured (JSON) logging. LogstashEncoder writes one JSON object per line,
+  automatically including everything in MDC — which is exactly how RequestIdFilter's
+  request ID ends up on every log line for a request, with no per-logger wiring
+  needed. This replaces Spring Boot's default human-readable console pattern
+  entirely (including its own banner/startup lines), which is the standard trade-off
+  for structured logging: less pleasant to eyeball in a raw terminal, but every line
+  is machine-parseable — greppable by field, and ready to ship to something like
+  Elasticsearch/Loki without a separate log-parsing step.
+-->
+<configuration>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+    <logger name="com.llmgateway" level="INFO"/>
+
+</configuration>

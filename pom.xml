@@ -83,6 +83,24 @@
             <version>${resilience4j.version}</version>
         </dependency>
 
+        <!-- Phase 6: health/metrics endpoints + Prometheus export format + JSON
+             (structured) log output. logstash-logback-encoder pinned to 7.4, the last
+             line compatible with Logback 1.4.x (what Spring Boot 3.2.5 manages) — 8.x+
+             requires Logback 1.5+. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
