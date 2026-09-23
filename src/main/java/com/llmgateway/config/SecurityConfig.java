@@ -1,10 +1,13 @@
 package com.llmgateway.config;
 
+import com.llmgateway.ratelimit.RateLimitFilter;
+import com.llmgateway.ratelimit.RateLimiter;
 import com.llmgateway.repository.ApiKeyRepository;
 import com.llmgateway.security.AdminTokenAuthenticationFilter;
 import com.llmgateway.security.ApiKeyAuthenticationFilter;
 import com.llmgateway.security.ApiKeyHasher;
 import com.llmgateway.security.JsonAuthenticationEntryPoint;
+import com.llmgateway.security.JsonErrorResponseWriter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -51,9 +54,14 @@ public class SecurityConfig {
     public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http,
                                                         ApiKeyRepository apiKeyRepository,
                                                         ApiKeyHasher apiKeyHasher,
-                                                        JsonAuthenticationEntryPoint entryPoint) throws Exception {
+                                                        JsonAuthenticationEntryPoint entryPoint,
+                                                        RateLimiter rateLimiter,
+                                                        RateLimitProperties rateLimitProperties,
+                                                        JsonErrorResponseWriter errorResponseWriter) throws Exception {
         ApiKeyAuthenticationFilter apiKeyAuthenticationFilter =
                 new ApiKeyAuthenticationFilter(apiKeyRepository, apiKeyHasher, entryPoint);
+        RateLimitFilter rateLimitFilter =
+                new RateLimitFilter(rateLimiter, rateLimitProperties, errorResponseWriter);
 
         http
                 // Stateless API authenticated by a header, not a browser session. CSRF
@@ -69,7 +77,10 @@ public class SecurityConfig {
                         .anyRequest().denyAll()
                 )
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(entryPoint))
-                .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // Runs after API-key auth: it needs to know who the caller is (and
+                // their tier) before it can look up the right bucket.
+                .addFilterAfter(rateLimitFilter, ApiKeyAuthenticationFilter.class);
 
         return http.build();
     }

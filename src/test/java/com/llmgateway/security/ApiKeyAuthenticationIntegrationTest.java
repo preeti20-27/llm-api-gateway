@@ -10,9 +10,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -32,6 +35,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * Creating a key is itself behind the admin token (see AdminTokenAuthenticationIntegrationTest
  * for that check in isolation), so a fixed test token is configured here purely as setup.
+ *
+ * A successful /v1/chat call now also passes through RateLimitFilter, which talks to
+ * Redis — so this class needs a real Redis alongside Postgres. There's no @ServiceConnection
+ * detector for a plain Redis GenericContainer (unlike Postgres), so its host/port are
+ * wired in by hand via @DynamicPropertySource instead.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -42,6 +50,15 @@ class ApiKeyAuthenticationIntegrationTest {
     @Container
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+
+    @Container
+    static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+
+    @DynamicPropertySource
+    static void redisProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.data.redis.host", redis::getHost);
+        registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
+    }
 
     @Autowired
     private MockMvc mockMvc;

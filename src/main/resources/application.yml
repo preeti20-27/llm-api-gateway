@@ -17,9 +17,23 @@ spring:
       ddl-auto: validate # schema is owned by Flyway migrations, never by Hibernate
   flyway:
     enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 admin:
   token: ${ADMIN_TOKEN:}
+
+# Token-bucket capacity per tier. Operational tuning, not a secret — plain YAML,
+# not env-driven. See RateLimitProperties / the Phase 3 write-up for the algorithm.
+rate-limit:
+  free:
+    capacity: 10
+    window-seconds: 60
+  pro:
+    capacity: 100
+    window-seconds: 60
 
 gemini:
   api-key: ${GEMINI_API_KEY:}

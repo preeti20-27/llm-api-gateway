@@ -31,7 +31,7 @@ class AdminTokenAuthenticationFilterTest {
     // ObjectMapper bean does this same discovery for you; here it's done by hand since
     // this test builds the entry point outside of a Spring context on purpose.
     private final JsonAuthenticationEntryPoint entryPoint =
-            new JsonAuthenticationEntryPoint(new ObjectMapper().findAndRegisterModules());
+            new JsonAuthenticationEntryPoint(new JsonErrorResponseWriter(new ObjectMapper().findAndRegisterModules()));
 
     @AfterEach
     void clearSecurityContext() {
