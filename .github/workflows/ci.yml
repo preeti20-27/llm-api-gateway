@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # No GEMINI_API_KEY, ADMIN_TOKEN, or any other secret is set here, and none
+      # is needed: every test that touches a provider mocks GeminiProvider/
+      # OllamaProvider/FailoverLlmProvider directly (see GeminiProviderTest,
+      # ChatServiceTest, FailoverLlmProviderTest, and the *IntegrationTest classes).
+      # Integration tests spin up their own Postgres/Redis via Testcontainers —
+      # ubuntu-latest runners have Docker preinstalled, so this needs no extra setup.
+      - name: Run tests
+        run: ./mvnw --batch-mode test
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/
+          retention-days: 14

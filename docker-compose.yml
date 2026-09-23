@@ -1,7 +1,35 @@
-# Local dev infrastructure. Postgres (Phase 2), Redis (Phase 3), Prometheus +
-# Grafana (Phase 6). The app itself runs on the host (mvnw spring-boot:run), not in
-# this compose file — Prometheus reaches it via host.docker.internal.
+# One-command local stack: the app itself (built from ./Dockerfile), Postgres,
+# Redis, Prometheus and Grafana. `docker compose up -d --build` is the whole setup.
+#
+# For active development (hot-reload, debugging in an IDE) run just the
+# infrastructure — `docker compose up -d postgres redis prometheus grafana` — and
+# the app separately via `./mvnw spring-boot:run` on the host instead; see the
+# README's "Running locally for development" section.
 services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      # Overrides the host/port-style values .env.example sets for running the app
+      # directly on the host via mvnw — inside this compose network, services
+      # address each other by service name, not localhost.
+      DB_URL: jdbc:postgresql://postgres:5432/llm_gateway
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    extra_hosts:
+      # So the containerized app can still reach a locally installed Ollama (which
+      # runs on the host, not in this compose network) if OLLAMA_BASE_URL in .env
+      # points at host.docker.internal.
+      - "host.docker.internal:host-gateway"
+
   postgres:
     image: postgres:16-alpine
     environment:
@@ -38,9 +66,8 @@ services:
     ports:
       - "9090:9090"
     extra_hosts:
-      # Lets the container reach the app running on the host. Docker Desktop
-      # (Mac/Windows) resolves this automatically; plain Linux Docker needs this
-      # host-gateway mapping explicitly, which is why it's here rather than assumed.
+      # Only needed for the host.docker.internal scrape target in prometheus.yml —
+      # covers the "app run via mvnw on the host" case. See that file's comment.
       - "host.docker.internal:host-gateway"
 
   grafana:

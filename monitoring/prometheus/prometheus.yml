@@ -5,6 +5,14 @@ scrape_configs:
   - job_name: llm-api-gateway
     metrics_path: /actuator/prometheus
     static_configs:
-      # The app runs on the host, not in this compose network — see docker-compose.yml's
-      # extra_hosts entry for why host.docker.internal resolves here.
+      # Covers both ways to run the app: containerized via docker-compose (the
+      # one-command path, reachable as "app" on the compose network) or on the host
+      # via mvnw for active development (reachable as host.docker.internal). Whichever
+      # one isn't actually running just shows as down in Prometheus's own `up` metric
+      # — harmless, not a scrape error.
+      - targets: ["app:8080"]
+        labels:
+          instance: "app (docker compose)"
       - targets: ["host.docker.internal:8080"]
+        labels:
+          instance: "app (mvnw, host)"

@@ -1,0 +1,8 @@
+.git
+.env
+target
+*.md
+.idea
+.vscode
+monitoring
+k6
