@@ -71,7 +71,7 @@ class ApiKeyAuthenticationIntegrationTest {
 
     @Test
     void createdKey_authenticatesSuccessfullyOnProtectedEndpoint() throws Exception {
-        when(chatService.chat(any())).thenReturn(new ChatResponse("hi there", "gemini", false, 3, 42));
+        when(chatService.chat(any(), any())).thenReturn(new ChatResponse("hi there", "gemini", false, 3, 42));
 
         MvcResult createResult = mockMvc.perform(post("/admin/keys")
                         .header(AdminTokenAuthenticationFilter.ADMIN_TOKEN_HEADER, "test-admin-token")

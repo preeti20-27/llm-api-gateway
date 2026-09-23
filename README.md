@@ -8,16 +8,19 @@ Being built in phases — see progress below. Full architecture, setup instructi
 API docs will land in the README as later phases (observability, Docker Compose, CI,
 load test results) are completed.
 
-## Status: Phase 3 — distributed rate limiting
+## Status: Phase 4 — response caching and usage metering
 
 What exists so far:
 - Maven project, Java 21, Spring Boot 3.2.5, Maven Wrapper (`mvnw` / `mvnw.cmd`) so a
   local Maven install isn't required
 - `POST /v1/chat` forwards a prompt to Google Gemini and returns the generated text —
-  requires a valid `X-API-Key` header and is subject to a per-key rate limit
+  requires a valid `X-API-Key` header, is subject to a per-key rate limit, and
+  identical requests are served from a Redis cache (`cached: true` in the response)
 - `POST /admin/keys` creates an API key for a given name + tier (`FREE`/`PRO`) and
   returns the raw key **once**; only its SHA-256 hash is ever stored (Postgres, via
   Flyway migration `V1__create_api_keys_table.sql`)
+- `GET /v1/usage` returns the calling key's total requests, tokens, estimated cost,
+  and cache hits (Postgres `usage_logs`, Flyway `V2__create_usage_logs_table.sql`)
 - Two Spring Security filter chains, each scoped to its own URL space: `/v1/**`
   requires a valid `X-API-Key`; `/admin/**` requires `X-Admin-Token` to match
   `ADMIN_TOKEN` (constant-time comparison, fails closed if unset) — either one
@@ -27,8 +30,13 @@ What exists so far:
   requests or gateway instances. Limits are per tier (`rate-limit.free` /
   `rate-limit.pro` in `application.yml`). Over the limit → `429` with `Retry-After`;
   every `/v1/chat` response (allowed or not) carries `X-RateLimit-Remaining`
+- Response cache key = SHA-256 of (model + normalized prompt + maxTokens), Redis with
+  a TTL (`cache.ttl-seconds`) — deliberately shared across every caller, not scoped
+  per API key (see the Phase 4 write-up for the trade-off)
+- Usage is written **asynchronously** (`@Async`, on a virtual-thread executor) so
+  logging never adds latency to the response the client is waiting on
 - Clean package layout: `controller / service / provider / repository / entity /
-  security / ratelimit / config / dto / exception`
+  security / ratelimit / cache / util / config / dto / exception`
 - Global exception handler → consistent JSON error body on any failure
 
 ### Running locally
@@ -50,11 +58,16 @@ curl -X POST http://localhost:8080/admin/keys \
   -H "X-Admin-Token: <your ADMIN_TOKEN>" \
   -d '{"name": "my-test-app", "tier": "FREE"}'
 
-# 2. Use it (FREE tier defaults to 10 requests/min — repeat 11 times to see a 429)
+# 2. Use it (FREE tier defaults to 10 requests/min — repeat 11 times to see a 429).
+#    Run this exact command twice: the second response has "cached": true.
 curl -i -X POST http://localhost:8080/v1/chat \
   -H "Content-Type: application/json" \
   -H "X-API-Key: sk-<the key from step 1>" \
   -d '{"prompt": "Say hello in one sentence."}'
+
+# 3. Check usage (requests, tokens, estimated cost, cache hits) for that key
+curl http://localhost:8080/v1/usage \
+  -H "X-API-Key: sk-<the key from step 1>"
 ```
 
 ### Running tests
@@ -81,7 +94,7 @@ $env:DOCKER_HOST = "npipe:////./pipe/dockerDesktopLinuxEngine"
 - [x] Phase 1: Project skeleton and basic proxy
 - [x] Phase 2: API-key authentication
 - [x] Phase 3: Distributed rate limiting (Redis + Lua)
-- [ ] Phase 4: Response caching and usage metering
+- [x] Phase 4: Response caching and usage metering
 - [ ] Phase 5: Failover and resilience (Ollama fallback, circuit breaker)
 - [ ] Phase 6: Observability (Prometheus + Grafana)
 - [ ] Phase 7: Testing, load test, CI, docs

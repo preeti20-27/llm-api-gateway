@@ -35,6 +35,18 @@ rate-limit:
     capacity: 100
     window-seconds: 60
 
+# How long a cached chat response stays valid. Also plain YAML — see the Phase 4
+# write-up for why TTL expiry, not explicit invalidation, is the right call here.
+cache:
+  ttl-seconds: 300
+
+# Estimated cost, one blended rate per provider — see PricingProperties for why
+# "estimated". gemini-1.5-flash's real per-token price as of writing; update if it
+# changes, this isn't fetched live.
+pricing:
+  cost-per-thousand-tokens:
+    gemini: 0.00025
+
 gemini:
   api-key: ${GEMINI_API_KEY:}
   base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}

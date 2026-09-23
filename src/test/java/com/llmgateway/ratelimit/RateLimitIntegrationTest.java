@@ -91,7 +91,7 @@ class RateLimitIntegrationTest {
 
     @Test
     void requestsWithinCapacity_succeedAndDecrementRemaining() throws Exception {
-        when(chatService.chat(any())).thenReturn(new ChatResponse("ok", "gemini", false, 1, 5));
+        when(chatService.chat(any(), any())).thenReturn(new ChatResponse("ok", "gemini", false, 1, 5));
         String apiKey = createApiKey("within-capacity");
 
         chatRequest(apiKey, status().isOk(), header().string("X-RateLimit-Remaining", "2"));
@@ -100,7 +100,7 @@ class RateLimitIntegrationTest {
 
     @Test
     void exceedingCapacity_returns429WithRetryAfterAndZeroRemaining() throws Exception {
-        when(chatService.chat(any())).thenReturn(new ChatResponse("ok", "gemini", false, 1, 5));
+        when(chatService.chat(any(), any())).thenReturn(new ChatResponse("ok", "gemini", false, 1, 5));
         String apiKey = createApiKey("exceeding-capacity");
 
         chatRequest(apiKey, status().isOk());
@@ -115,7 +115,7 @@ class RateLimitIntegrationTest {
 
     @Test
     void differentApiKeys_haveIndependentBuckets() throws Exception {
-        when(chatService.chat(any())).thenReturn(new ChatResponse("ok", "gemini", false, 1, 5));
+        when(chatService.chat(any(), any())).thenReturn(new ChatResponse("ok", "gemini", false, 1, 5));
         String keyA = createApiKey("bucket-a");
         String keyB = createApiKey("bucket-b");
 
