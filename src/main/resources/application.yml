@@ -1,0 +1,18 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: llm-api-gateway
+  threads:
+    virtual:
+      enabled: true # Java 21 virtual threads for request handling (Tomcat)
+
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+  model: ${GEMINI_MODEL:gemini-1.5-flash}
+
+logging:
+  level:
+    com.llmgateway: INFO
