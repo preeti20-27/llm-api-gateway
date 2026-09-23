@@ -7,6 +7,16 @@ spring:
   threads:
     virtual:
       enabled: true # Java 21 virtual threads for request handling (Tomcat)
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/llm_gateway}
+    username: ${DB_USERNAME:llm_gateway}
+    password: ${DB_PASSWORD:llm_gateway}
+  jpa:
+    open-in-view: false # avoids the open-session-in-view anti-pattern; see Phase 2 write-up
+    hibernate:
+      ddl-auto: validate # schema is owned by Flyway migrations, never by Hibernate
+  flyway:
+    enabled: true
 
 gemini:
   api-key: ${GEMINI_API_KEY:}

@@ -1,0 +1,21 @@
+# Local dev infrastructure. Starts with just Postgres (needed from Phase 2 onward);
+# Redis, Prometheus and Grafana are added here in later phases.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: llm_gateway
+      POSTGRES_USER: llm_gateway
+      POSTGRES_PASSWORD: llm_gateway
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llm_gateway"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
