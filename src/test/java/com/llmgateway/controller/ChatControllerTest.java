@@ -1,15 +1,12 @@
 package com.llmgateway.controller;
 
 import com.llmgateway.dto.ChatResponse;
-import com.llmgateway.security.ApiKeyAuthenticationFilter;
 import com.llmgateway.service.ChatService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -32,17 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * X-API-Key check added in Phase 2): this test is only about ChatController's
  * request/response mapping. Authentication itself is covered separately by
  * ApiKeyAuthenticationIntegrationTest, against a real database.
- *
- * ApiKeyAuthenticationFilter would otherwise still be picked up as a bean by this
- * slice — it's a @Component implementing Filter, which @WebMvcTest auto-detects
- * regardless of addFilters — and pull in its own dependencies (ApiKeyRepository,
- * ApiKeyHasher). excludeFilters keeps it out of this context entirely, since this
- * test isn't about security at all.
  */
-@WebMvcTest(
-        controllers = ChatController.class,
-        excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = ApiKeyAuthenticationFilter.class)
-)
+@WebMvcTest(ChatController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class ChatControllerTest {
 

@@ -8,7 +8,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -20,25 +19,30 @@ import java.util.Optional;
  * <ul>
  *   <li>no X-API-Key header: leave the request unauthenticated and continue — whether
  *       that's allowed is decided afterwards by SecurityConfig's authorizeHttpRequests
- *       rules (e.g. /admin/** doesn't require one, /v1/** does).</li>
+ *       rules.</li>
  *   <li>header present and matches an active key: populate the SecurityContext, continue.</li>
  *   <li>header present but doesn't match: reject immediately with 401, even for an
  *       endpoint that wouldn't otherwise require auth — presenting a bad key is always
  *       treated as an error, never silently ignored.</li>
  * </ul>
+ * <p>
+ * Deliberately NOT a @Component: Spring Boot auto-registers any Filter bean it finds
+ * as a generic servlet filter bound to every request, independent of Spring Security's
+ * own filter chain — which would mean this filter risks running twice per request.
+ * Instead, SecurityConfig constructs it directly and wires it into HttpSecurity, which
+ * is the pattern Spring Security's own docs use for custom filters.
  */
-@Component
 public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     public static final String API_KEY_HEADER = "X-API-Key";
 
     private final ApiKeyRepository apiKeyRepository;
     private final ApiKeyHasher apiKeyHasher;
-    private final ApiKeyAuthenticationEntryPoint entryPoint;
+    private final JsonAuthenticationEntryPoint entryPoint;
 
     public ApiKeyAuthenticationFilter(ApiKeyRepository apiKeyRepository,
                                        ApiKeyHasher apiKeyHasher,
-                                       ApiKeyAuthenticationEntryPoint entryPoint) {
+                                       JsonAuthenticationEntryPoint entryPoint) {
         this.apiKeyRepository = apiKeyRepository;
         this.apiKeyHasher = apiKeyHasher;
         this.entryPoint = entryPoint;

@@ -1,22 +1,60 @@
 package com.llmgateway.config;
 
-import com.llmgateway.security.ApiKeyAuthenticationEntryPoint;
+import com.llmgateway.repository.ApiKeyRepository;
+import com.llmgateway.security.AdminTokenAuthenticationFilter;
 import com.llmgateway.security.ApiKeyAuthenticationFilter;
+import com.llmgateway.security.ApiKeyHasher;
+import com.llmgateway.security.JsonAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+/**
+ * Two separate filter chains, each scoped to its own URL space via securityMatcher —
+ * the standard Spring Security pattern for "different auth mechanism per area of the
+ * app" (see the reference docs' "Multiple HttpSecurity instances"). /admin/** uses a
+ * single shared-secret header; /v1/** uses per-caller API keys. @Order picks which
+ * chain Spring Security tries to match a request against first — it must be explicit
+ * here since neither chain otherwise implies an order.
+ */
 @Configuration
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                     ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
-                                                     ApiKeyAuthenticationEntryPoint entryPoint) throws Exception {
+    @Order(1)
+    public SecurityFilterChain adminSecurityFilterChain(HttpSecurity http,
+                                                          AdminSecurityProperties adminSecurityProperties,
+                                                          JsonAuthenticationEntryPoint entryPoint) throws Exception {
+        AdminTokenAuthenticationFilter adminTokenAuthenticationFilter =
+                new AdminTokenAuthenticationFilter(adminSecurityProperties, entryPoint);
+
+        http
+                .securityMatcher("/admin/**")
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(auth -> auth.anyRequest().hasRole("ADMIN"))
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(entryPoint))
+                .addFilterBefore(adminTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
+    public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http,
+                                                        ApiKeyRepository apiKeyRepository,
+                                                        ApiKeyHasher apiKeyHasher,
+                                                        JsonAuthenticationEntryPoint entryPoint) throws Exception {
+        ApiKeyAuthenticationFilter apiKeyAuthenticationFilter =
+                new ApiKeyAuthenticationFilter(apiKeyRepository, apiKeyHasher, entryPoint);
+
         http
                 // Stateless API authenticated by a header, not a browser session. CSRF
                 // protection exists to stop a browser silently replaying a victim's
@@ -27,11 +65,6 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        // Phase 2 scope note: /admin/** is intentionally NOT locked down yet.
-                        // Anyone who can reach this service can mint API keys right now — that's
-                        // a real gap, not an oversight, and it's called out in the phase write-up
-                        // as a follow-up rather than silently left for later.
-                        .requestMatchers("/admin/**").permitAll()
                         .requestMatchers("/v1/**").authenticated()
                         .anyRequest().denyAll()
                 )

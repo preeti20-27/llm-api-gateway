@@ -18,6 +18,9 @@ spring:
   flyway:
     enabled: true
 
+admin:
+  token: ${ADMIN_TOKEN:}
+
 gemini:
   api-key: ${GEMINI_API_KEY:}
   base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}

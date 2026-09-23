@@ -13,18 +13,21 @@ import java.io.IOException;
 import java.time.Instant;
 
 /**
- * Runs whenever Spring Security rejects a request — missing or invalid X-API-Key.
- * This happens inside the security filter chain, upstream of any controller, so
- * GlobalExceptionHandler's @RestControllerAdvice never sees it; this class writes
- * the same ErrorResponse JSON shape by hand so clients get one consistent error
- * format everywhere, auth failures included.
+ * Runs whenever Spring Security rejects a request — shared by both auth mechanisms
+ * in this app (ApiKeyAuthenticationFilter for /v1/**, AdminTokenAuthenticationFilter
+ * for /admin/**). This happens inside the security filter chain, upstream of any
+ * controller, so GlobalExceptionHandler's @RestControllerAdvice never sees it; this
+ * class writes the same ErrorResponse JSON shape by hand so clients get one
+ * consistent error format everywhere, auth failures included. The message comes
+ * from whichever filter raised the AuthenticationException, so it stays accurate
+ * for both "invalid API key" and "invalid admin token" cases.
  */
 @Component
-public class ApiKeyAuthenticationEntryPoint implements AuthenticationEntryPoint {
+public class JsonAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     private final ObjectMapper objectMapper;
 
-    public ApiKeyAuthenticationEntryPoint(ObjectMapper objectMapper) {
+    public JsonAuthenticationEntryPoint(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
@@ -38,7 +41,7 @@ public class ApiKeyAuthenticationEntryPoint implements AuthenticationEntryPoint 
                 Instant.now(),
                 HttpServletResponse.SC_UNAUTHORIZED,
                 "Unauthorized",
-                "Missing or invalid API key",
+                authException.getMessage(),
                 request.getRequestURI()
         );
         response.getWriter().write(objectMapper.writeValueAsString(body));

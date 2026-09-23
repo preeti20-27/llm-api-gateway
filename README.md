@@ -18,21 +18,19 @@ What exists so far:
 - `POST /admin/keys` creates an API key for a given name + tier (`FREE`/`PRO`) and
   returns the raw key **once**; only its SHA-256 hash is ever stored (Postgres, via
   Flyway migration `V1__create_api_keys_table.sql`)
-- Spring Security filter validates `X-API-Key` on every request; missing/invalid →
-  `401` with the same JSON error shape as every other error
+- Two Spring Security filter chains, each scoped to its own URL space: `/v1/**`
+  requires a valid `X-API-Key`; `/admin/**` requires `X-Admin-Token` to match
+  `ADMIN_TOKEN` (constant-time comparison, fails closed if unset) — either one
+  missing/invalid → `401` with the same JSON error shape as every other error
 - Clean package layout: `controller / service / provider / repository / entity /
   security / config / dto / exception`
 - Global exception handler → consistent JSON error body on any failure
-
-**Known Phase 2 gap (intentional, not an oversight):** `/admin/keys` itself isn't
-locked down yet — anyone who can reach the service can mint a key. That's real scope
-for later, flagged here rather than silently left unaddressed.
 
 ### Running locally
 
 ```bash
 cp .env.example .env
-# edit .env and set GEMINI_API_KEY
+# edit .env and set GEMINI_API_KEY and ADMIN_TOKEN (e.g. `openssl rand -hex 32`)
 
 docker compose up -d postgres
 
@@ -41,9 +39,10 @@ docker compose up -d postgres
 ```
 
 ```bash
-# 1. Create a key (returns the raw key once)
+# 1. Create a key (returns the raw key once) — requires the admin token
 curl -X POST http://localhost:8080/admin/keys \
   -H "Content-Type: application/json" \
+  -H "X-Admin-Token: <your ADMIN_TOKEN>" \
   -d '{"name": "my-test-app", "tier": "FREE"}'
 
 # 2. Use it

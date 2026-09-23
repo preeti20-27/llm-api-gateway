@@ -10,8 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -30,10 +29,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * end to end — create a key through the public API, then use that exact raw key to
  * authenticate a protected request. Nothing here is mocked except ChatService, so we
  * don't need a Gemini API key to run it.
+ *
+ * Creating a key is itself behind the admin token (see AdminTokenAuthenticationIntegrationTest
+ * for that check in isolation), so a fixed test token is configured here purely as setup.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
+@TestPropertySource(properties = "admin.token=test-admin-token")
 class ApiKeyAuthenticationIntegrationTest {
 
     @Container
@@ -54,6 +57,7 @@ class ApiKeyAuthenticationIntegrationTest {
         when(chatService.chat(any())).thenReturn(new ChatResponse("hi there", "gemini", false, 3, 42));
 
         MvcResult createResult = mockMvc.perform(post("/admin/keys")
+                        .header(AdminTokenAuthenticationFilter.ADMIN_TOKEN_HEADER, "test-admin-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\": \"integration-test\", \"tier\": \"FREE\"}"))
                 .andExpect(status().isCreated())
@@ -87,15 +91,5 @@ class ApiKeyAuthenticationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"prompt\": \"hi\"}"))
                 .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void adminKeysEndpoint_doesNotRequireApiKey() throws Exception {
-        // Documents current Phase 2 scope: /admin/keys is open. Locking it down is
-        // tracked as a follow-up (see SecurityConfig), not silently assumed done.
-        mockMvc.perform(post("/admin/keys")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\": \"no-auth-needed\", \"tier\": \"FREE\"}"))
-                .andExpect(status().isCreated());
     }
 }

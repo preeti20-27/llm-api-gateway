@@ -2,15 +2,12 @@ package com.llmgateway.controller;
 
 import com.llmgateway.dto.CreateApiKeyResponse;
 import com.llmgateway.entity.ApiKeyTier;
-import com.llmgateway.security.ApiKeyAuthenticationFilter;
 import com.llmgateway.service.ApiKeyService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.FilterType;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -27,18 +24,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Slice test for request/response mapping only — ApiKeyService is mocked, so this
  * never touches a real database. Security filters are disabled here for the same
  * reason as in ChatControllerTest; the real end-to-end "create a key, then use it"
- * flow is covered by ApiKeyAuthenticationIntegrationTest.
- *
- * ApiKeyAuthenticationFilter would otherwise still be picked up as a bean by this
- * slice — it's a @Component implementing Filter, which @WebMvcTest auto-detects
- * regardless of addFilters — and pull in its own dependencies (ApiKeyRepository,
- * ApiKeyHasher). excludeFilters keeps it out of this context entirely, since this
- * test isn't about security at all.
+ * flow (including the X-Admin-Token check) is covered by
+ * AdminTokenAuthenticationIntegrationTest.
  */
-@WebMvcTest(
-        controllers = AdminKeyController.class,
-        excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = ApiKeyAuthenticationFilter.class)
-)
+@WebMvcTest(AdminKeyController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class AdminKeyControllerTest {
 
