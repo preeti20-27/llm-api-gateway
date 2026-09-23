@@ -52,11 +52,7 @@ class ChatServiceTest {
 
         when(cacheKeyGenerator.generate(null, "hello", null)).thenReturn("cache-key-abc");
         when(responseCache.get("cache-key-abc")).thenReturn(Optional.empty());
-        when(llmProvider.generate("hello", null, null)).thenReturn(new LlmProviderResponse("hi there", 5));
-        // Only stubbed here, not in a shared @BeforeEach: the cache-hit test below
-        // asserts zero interactions with llmProvider, and even a stub-only call
-        // counts as an interaction for that assertion.
-        when(llmProvider.name()).thenReturn("gemini");
+        when(llmProvider.generate("hello", null, null)).thenReturn(new LlmProviderResponse("hi there", 5, "gemini"));
 
         ChatResponse response = chatService.chat(request, apiKeyId);
 

@@ -46,11 +46,40 @@ cache:
 pricing:
   cost-per-thousand-tokens:
     gemini: 0.00025
+    ollama: 0.0 # local model — no per-token charge
 
 gemini:
   api-key: ${GEMINI_API_KEY:}
   base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
   model: ${GEMINI_MODEL:gemini-1.5-flash}
+
+ollama:
+  base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+  model: ${OLLAMA_MODEL:llama3.2}
+
+# Circuit breaker + retry + timeout around the primary (Gemini) provider — see
+# FailoverLlmProvider and the Phase 5 write-up for what each threshold means and how
+# to tune them. Plain YAML: operational tuning, not a secret.
+resilience4j:
+  circuitbreaker:
+    instances:
+      gemini:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10          # evaluate the last 10 calls
+        minimum-number-of-calls: 5       # need at least 5 before computing a failure rate at all
+        failure-rate-threshold: 50       # >=50% of those failing trips the breaker OPEN
+        wait-duration-in-open-state: 30s # stay OPEN (fail fast to Ollama) this long before probing again
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+  retry:
+    instances:
+      gemini:
+        max-attempts: 3
+        wait-duration: 500ms
+  timelimiter:
+    instances:
+      gemini:
+        timeout-duration: 5s
 
 logging:
   level:

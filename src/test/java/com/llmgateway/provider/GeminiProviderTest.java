@@ -61,6 +61,7 @@ class GeminiProviderTest {
 
         assertThat(result.text()).isEqualTo("Hello, world!");
         assertThat(result.tokensUsed()).isEqualTo(7);
+        assertThat(result.provider()).isEqualTo("gemini");
         server.verify();
     }
 

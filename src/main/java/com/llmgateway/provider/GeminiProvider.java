@@ -63,7 +63,7 @@ public class GeminiProvider implements LlmProvider {
                 ? apiResponse.usageMetadata().totalTokenCount()
                 : 0;
 
-        return new LlmProviderResponse(text, tokensUsed);
+        return new LlmProviderResponse(text, tokensUsed, name());
     }
 
     // ---- Gemini wire format (request/response JSON shapes) ----

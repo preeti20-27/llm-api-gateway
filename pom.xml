@@ -25,6 +25,8 @@
              the latest 1.x release, which stays source-compatible with the 1.x API used
              in these tests. -->
         <testcontainers.version>1.21.4</testcontainers.version>
+        <!-- Not managed by Spring Boot's own BOM, so pinned explicitly. -->
+        <resilience4j.version>2.2.0</resilience4j.version>
     </properties>
 
     <dependencies>
@@ -65,6 +67,20 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!-- Phase 5: circuit breaker + retry + timeout around the primary (Gemini)
+             provider. resilience4j-spring-boot3 wires @CircuitBreaker/@Retry/@TimeLimiter
+             as Spring AOP method interceptors, which needs an AOP proxy — hence the
+             explicit spring-boot-starter-aop alongside it. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+            <version>${resilience4j.version}</version>
         </dependency>
 
         <dependency>

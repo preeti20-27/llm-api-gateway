@@ -8,12 +8,13 @@ Being built in phases — see progress below. Full architecture, setup instructi
 API docs will land in the README as later phases (observability, Docker Compose, CI,
 load test results) are completed.
 
-## Status: Phase 4 — response caching and usage metering
+## Status: Phase 5 — failover and resilience
 
 What exists so far:
 - Maven project, Java 21, Spring Boot 3.2.5, Maven Wrapper (`mvnw` / `mvnw.cmd`) so a
   local Maven install isn't required
-- `POST /v1/chat` forwards a prompt to Google Gemini and returns the generated text —
+- `POST /v1/chat` forwards a prompt to Google Gemini (falling back to a local Ollama
+  instance if Gemini is failing — see below) and returns the generated text —
   requires a valid `X-API-Key` header, is subject to a per-key rate limit, and
   identical requests are served from a Redis cache (`cached: true` in the response)
 - `POST /admin/keys` creates an API key for a given name + tier (`FREE`/`PRO`) and
@@ -35,15 +36,23 @@ What exists so far:
   per API key (see the Phase 4 write-up for the trade-off)
 - Usage is written **asynchronously** (`@Async`, on a virtual-thread executor) so
   logging never adds latency to the response the client is waiting on
+- `FailoverLlmProvider` wraps Gemini with a Resilience4j circuit breaker, retry, and
+  timeout (`resilience4j.*` in `application.yml`); when any of those trips, the same
+  request transparently falls back to a local Ollama instance instead of failing —
+  `ChatResponse.provider` reports whichever one actually answered
 - Clean package layout: `controller / service / provider / repository / entity /
   security / ratelimit / cache / util / config / dto / exception`
-- Global exception handler → consistent JSON error body on any failure
+- Global exception handler → consistent JSON error body on any failure, and now also
+  logs the real stack trace server-side for anything unexpected (the client still
+  only ever sees the generic message)
 
 ### Running locally
 
 ```bash
 cp .env.example .env
 # edit .env and set GEMINI_API_KEY and ADMIN_TOKEN (e.g. `openssl rand -hex 32`)
+# Ollama fallback is optional for local dev — the app runs fine without it; Gemini
+# failures without Ollama installed just surface as a 502 instead of failing over.
 
 docker compose up -d postgres redis
 
@@ -95,6 +104,6 @@ $env:DOCKER_HOST = "npipe:////./pipe/dockerDesktopLinuxEngine"
 - [x] Phase 2: API-key authentication
 - [x] Phase 3: Distributed rate limiting (Redis + Lua)
 - [x] Phase 4: Response caching and usage metering
-- [ ] Phase 5: Failover and resilience (Ollama fallback, circuit breaker)
+- [x] Phase 5: Failover and resilience (Ollama fallback, circuit breaker)
 - [ ] Phase 6: Observability (Prometheus + Grafana)
 - [ ] Phase 7: Testing, load test, CI, docs

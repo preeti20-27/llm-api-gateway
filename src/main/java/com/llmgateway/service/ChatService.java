@@ -15,9 +15,10 @@ import java.util.UUID;
  * Orchestrates a chat request: checks the cache, calls the provider on a miss,
  * times the whole thing, records usage, shapes the response.
  * <p>
- * For now there is exactly one {@link LlmProvider} bean (Gemini), so Spring injects
- * it directly. From Phase 5 onward, provider selection (primary + failover) will be
- * pulled out into its own component rather than growing this class.
+ * Depends only on the LlmProvider interface — as of Phase 5, Spring injects
+ * FailoverLlmProvider (the @Primary implementation), which internally decides
+ * Gemini vs. Ollama per call. ChatService has no idea failover exists; it reads
+ * whichever provider name LlmProviderResponse itself reports.
  */
 @Service
 public class ChatService {
@@ -58,9 +59,9 @@ public class ChatService {
 
     private ChatResponse generateAndCache(ChatRequest request, String cacheKey, long start) {
         LlmProviderResponse result = llmProvider.generate(request.prompt(), request.model(), request.maxTokens());
-        responseCache.put(cacheKey, new CachedChatResult(result.text(), result.tokensUsed(), llmProvider.name()));
+        responseCache.put(cacheKey, new CachedChatResult(result.text(), result.tokensUsed(), result.provider()));
 
         long latencyMs = System.currentTimeMillis() - start;
-        return new ChatResponse(result.text(), llmProvider.name(), false, result.tokensUsed(), latencyMs);
+        return new ChatResponse(result.text(), result.provider(), false, result.tokensUsed(), latencyMs);
     }
 }

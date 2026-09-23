@@ -1,7 +1,7 @@
 package com.llmgateway.usage;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.llmgateway.provider.LlmProvider;
+import com.llmgateway.provider.FailoverLlmProvider;
 import com.llmgateway.provider.LlmProviderResponse;
 import com.llmgateway.security.AdminTokenAuthenticationFilter;
 import com.llmgateway.security.ApiKeyAuthenticationFilter;
@@ -33,10 +33,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Full stack (real Postgres + Redis via Testcontainers), but with LlmProvider itself
+ * Full stack (real Postgres + Redis via Testcontainers), but with the LlmProvider
  * mocked rather than ChatService — unlike the other integration tests, this one is
  * specifically about ChatService's own caching and usage-logging behavior, so
- * ChatService needs to be real. Only the actual Gemini HTTP call is faked.
+ * ChatService needs to be real. Mocking the concrete FailoverLlmProvider (rather
+ * than the LlmProvider interface it implements) targets it unambiguously — as of
+ * Phase 5 there are three LlmProvider beans (Gemini, Ollama, and this @Primary one),
+ * and FailoverLlmProvider is specifically the one ChatService is actually wired to.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -64,7 +67,7 @@ class UsageAndCacheIntegrationTest {
     private ObjectMapper objectMapper;
 
     @MockBean
-    private LlmProvider llmProvider;
+    private FailoverLlmProvider llmProvider;
 
     private String createApiKey() throws Exception {
         MvcResult result = mockMvc.perform(post("/admin/keys")
@@ -78,8 +81,7 @@ class UsageAndCacheIntegrationTest {
 
     @Test
     void secondIdenticalRequest_isServedFromCache_andUsageAccumulatesForBoth() throws Exception {
-        when(llmProvider.name()).thenReturn("gemini");
-        when(llmProvider.generate(any(), any(), any())).thenReturn(new LlmProviderResponse("mock answer", 7));
+        when(llmProvider.generate(any(), any(), any())).thenReturn(new LlmProviderResponse("mock answer", 7, "gemini"));
 
         String apiKey = createApiKey();
         String body = "{\"prompt\": \"What is Java?\"}";
